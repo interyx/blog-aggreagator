@@ -190,6 +190,16 @@ func handlerUsers(s *state, cmd command) error {
 	return nil
 }
 
+func handlerFeeds(s *state, cmd command) error {
+	ctx := context.Background()
+	feeds, err := s.db.GetAllFeeds(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%+v\n", feeds)
+	return nil
+}
+
 func handlerAgg(s *state, cmd command) error {
 	ctx := context.Background()
 	xaml, err := fetchFeed(ctx, "https://wagslane.dev/index.xml")
@@ -223,6 +233,7 @@ func main() {
 	myCommands.register("users", handlerUsers)
 	myCommands.register("agg", handlerAgg)
 	myCommands.register("addfeed", handlerAddFeed)
+	myCommands.register("feeds", handlerFeeds)
 	args := os.Args
 	if len(args) < 2 {
 		handleError(fmt.Errorf("Not enough arguments provided"))
