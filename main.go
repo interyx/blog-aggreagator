@@ -79,6 +79,16 @@ func handlerRegister(s *state, cmd command) error {
 	return nil
 }
 
+func handlerReset(s *state, cmd command) error {
+  ctx := context.Background()
+  err := s.db.DeleteAllUsers(ctx)
+  if err != nil {
+    return err
+  }
+  fmt.Println("All users have been deleted")
+  return nil;
+}
+
 func handleError(err error) {
 	if err != nil {
 		fmt.Printf("An error has occurred: %v\n", err)
@@ -101,6 +111,7 @@ func main() {
 	myCommands.names = make(map[string]func(*state, command) error, 5)
 	myCommands.register("login", handlerLogin)
 	myCommands.register("register", handlerRegister)
+  myCommands.register("reset", handlerReset)
 	args := os.Args
 	if len(args) < 2 {
 		handleError(fmt.Errorf("Not enough arguments provided"))
