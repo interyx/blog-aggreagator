@@ -8,6 +8,7 @@ import (
 	"html"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -78,7 +79,6 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 	if err != nil {
 		return &RSSFeed{}, err
 	}
-	// step 4: parse the request
 	var feed RSSFeed
 	err = xml.Unmarshal(body, &feed)
 	if err != nil {
@@ -90,7 +90,6 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 		feed.Channel.Item[i].Title = html.UnescapeString(feed.Channel.Item[i].Title)
 		feed.Channel.Item[i].Description = html.UnescapeString(feed.Channel.Item[i].Description)
 	}
-	// step 5: print the data
 	return &feed, nil
 }
 
@@ -132,6 +131,36 @@ func handlerRegister(s *state, cmd command) error {
 		return err
 	}
 	fmt.Printf("User %s was created!\nParams %v\n", newUser.Name, params)
+	return nil
+}
+
+func handlerAddFeed(s *state, cmd command) error {
+	ctx := context.Background()
+	user, err := s.db.GetUser(ctx, s.cfg.User)
+	if err != nil {
+		return fmt.Errorf("The logged in user does not exist.  Please log in again.")
+	}
+	if len(cmd.args) != 2 {
+		return fmt.Errorf("Wrong number of arguments.\nUSAGE: addfeed \"<feed name>\" <url>")
+	}
+
+	_, err = url.ParseRequestURI(cmd.args[1])
+	if err != nil {
+		return fmt.Errorf("Incorrectly formed URL\nUSAGE: addfeed \"<feed name>\" <url>")
+	}
+	params := database.CreateFeedParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name:      cmd.args[0],
+		UserID:    user.ID,
+		Url:       cmd.args[1],
+	}
+	res, err := s.db.CreateFeed(ctx, params)
+	if err != nil {
+		return fmt.Errorf("An error occurred while creating the feed.  Please try again.")
+	}
+	fmt.Printf("%s", res)
 	return nil
 }
 
@@ -193,6 +222,7 @@ func main() {
 	myCommands.register("reset", handlerReset)
 	myCommands.register("users", handlerUsers)
 	myCommands.register("agg", handlerAgg)
+	myCommands.register("addfeed", handlerAddFeed)
 	args := os.Args
 	if len(args) < 2 {
 		handleError(fmt.Errorf("Not enough arguments provided"))
