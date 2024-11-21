@@ -89,6 +89,22 @@ func handlerReset(s *state, cmd command) error {
   return nil;
 }
 
+func handlerUsers(s *state, cmd command) error {
+  ctx := context.Background()
+  users, err := s.db.GetAllUsers(ctx)
+  if err != nil {
+    return err
+  }
+  for _, user := range users {
+    fmt.Printf("* %s", user.Name)
+    if user.Name == s.cfg.User {
+      fmt.Printf(" (current)")
+    }
+    fmt.Printf("\n")
+  }
+  return nil
+}
+
 func handleError(err error) {
 	if err != nil {
 		fmt.Printf("An error has occurred: %v\n", err)
@@ -97,8 +113,8 @@ func handleError(err error) {
 	}
 }
 
+
 func main() {
-	fmt.Println("Welcome to THE GATOR ZONE! CHOMP CHOMP CHOMP")
 	cfg, err := config.Read()
 	handleError(err)
 	db, err := sql.Open("postgres", cfg.Db_url)
@@ -112,6 +128,7 @@ func main() {
 	myCommands.register("login", handlerLogin)
 	myCommands.register("register", handlerRegister)
   myCommands.register("reset", handlerReset)
+  myCommands.register("users", handlerUsers)
 	args := os.Args
 	if len(args) < 2 {
 		handleError(fmt.Errorf("Not enough arguments provided"))
