@@ -1,13 +1,19 @@
 package main
 
-import _ "github.com/lib/pq"
 import (
+	"context"
+	"database/sql"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/interyx/internal/config"
+	"github.com/interyx/internal/database"
+	_ "github.com/lib/pq"
 	"os"
+	"time"
 )
 
 type state struct {
+	db  *database.Queries
 	cfg *config.Config
 }
 
@@ -33,10 +39,16 @@ func (c *commands) run(s *state, cmd command) error {
 }
 
 func handlerLogin(s *state, cmd command) error {
+	ctx := context.Background()
 	if len(cmd.args) == 0 {
 		return fmt.Errorf("Login requires at least one argument\n")
 	}
-	err := s.cfg.SetUser(cmd.args[0])
+	username := cmd.args[0]
+	user, err := s.db.GetUser(ctx, username)
+	if err != nil {
+		return fmt.Errorf("No user with that name found")
+	}
+	err = s.cfg.SetUser(user.Name)
 	if err != nil {
 		return fmt.Errorf("An error occurred: %v\n", err)
 	}
@@ -44,32 +56,59 @@ func handlerLogin(s *state, cmd command) error {
 	return nil
 }
 
-func main() {
-	fmt.Println("Welcome to THE GATOR ZONE! CHOMP CHOMP CHOMP")
-	cfg, err := config.Read()
+func handlerRegister(s *state, cmd command) error {
+	if len(cmd.args) == 0 {
+		return fmt.Errorf("Registration requires a name argument.")
+	}
+	params := database.CreateUserParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name:      cmd.args[0],
+	}
+	ctx := context.Background()
+	newUser, err := s.db.CreateUser(ctx, params)
+	if err != nil {
+		return err
+	}
+	err = s.cfg.SetUser(newUser.Name)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("User %s was created!\nParams %v\n", newUser.Name, params)
+	return nil
+}
+
+func handleError(err error) {
 	if err != nil {
 		fmt.Printf("An error has occurred: %v\n", err)
 		fmt.Println("Exiting...")
 		os.Exit(1)
 	}
+}
+
+func main() {
+	fmt.Println("Welcome to THE GATOR ZONE! CHOMP CHOMP CHOMP")
+	cfg, err := config.Read()
+	handleError(err)
+	db, err := sql.Open("postgres", cfg.Db_url)
+	handleError(err)
 	thisState := state{
 		cfg: &cfg,
+		db:  database.New(db),
 	}
 	myCommands := commands{}
 	myCommands.names = make(map[string]func(*state, command) error, 5)
 	myCommands.register("login", handlerLogin)
+	myCommands.register("register", handlerRegister)
 	args := os.Args
 	if len(args) < 2 {
-		fmt.Println("Not enough arguments provided")
-		os.Exit(1)
+		handleError(fmt.Errorf("Not enough arguments provided"))
 	}
 	cmd := command{
 		name: args[1],
 		args: args[2:],
 	}
 	err = myCommands.run(&thisState, cmd)
-	if err != nil {
-		fmt.Printf("An error has occurred: %v\n", err)
-		os.Exit(1)
-	}
+	handleError(err)
 }
