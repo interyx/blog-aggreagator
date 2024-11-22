@@ -202,6 +202,21 @@ func handlerFollowing(s *state, cmd command, user database.User) error {
 	return nil
 }
 
+func handlerUnfollow(s *state, cmd command, user database.User) error {
+	if len(cmd.args) != 1 {
+		return fmt.Errorf("Wrong number of arguments.\nUsage: unfollow <url>")
+	}
+	params := database.DeleteFeedFollowParams{
+		Name: user.Name,
+		Url:  cmd.args[0],
+	}
+	err := s.db.DeleteFeedFollow(context.Background(), params)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func handleError(err error) {
 	if err != nil {
 		fmt.Printf("An error has occurred: %v\n", err)
