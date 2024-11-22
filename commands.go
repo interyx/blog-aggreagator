@@ -89,17 +89,12 @@ func handlerRegister(s *state, cmd command) error {
 	return nil
 }
 
-func handlerAddFeed(s *state, cmd command) error {
-	ctx := context.Background()
-	user, err := s.db.GetUser(ctx, s.cfg.User)
-	if err != nil {
-		return fmt.Errorf("The logged in user does not exist.  Please log in again.")
-	}
+func handlerAddFeed(s *state, cmd command, user database.User) error {
 	if len(cmd.args) != 2 {
 		return fmt.Errorf("Wrong number of arguments.\nUSAGE: addfeed \"<feed name>\" <url>")
 	}
 
-	_, err = url.ParseRequestURI(cmd.args[1])
+	_, err := url.ParseRequestURI(cmd.args[1])
 	if err != nil {
 		return fmt.Errorf("Incorrectly formed URL\nUSAGE: addfeed \"<feed name>\" <url>")
 	}
@@ -111,7 +106,7 @@ func handlerAddFeed(s *state, cmd command) error {
 		UserID:    user.ID,
 		Url:       cmd.args[1],
 	}
-	res, err := s.db.CreateFeed(ctx, params)
+	res, err := s.db.CreateFeed(context.Background(), params)
 	if err != nil {
 		return fmt.Errorf("An error occurred while creating the feed.  Please try again.")
 	}
@@ -122,7 +117,7 @@ func handlerAddFeed(s *state, cmd command) error {
 		UserID:    user.ID,
 		FeedID:    res.ID,
 	}
-	_, err = s.db.CreateFeedFollow(ctx, followParams)
+	_, err = s.db.CreateFeedFollow(context.Background(), followParams)
 	if err != nil {
 		return err
 	}
@@ -141,8 +136,7 @@ func handlerReset(s *state, cmd command) error {
 }
 
 func handlerUsers(s *state, cmd command) error {
-	ctx := context.Background()
-	users, err := s.db.GetAllUsers(ctx)
+	users, err := s.db.GetAllUsers(context.Background())
 	if err != nil {
 		return err
 	}
@@ -157,8 +151,7 @@ func handlerUsers(s *state, cmd command) error {
 }
 
 func handlerFeeds(s *state, cmd command) error {
-	ctx := context.Background()
-	feeds, err := s.db.GetAllFeeds(ctx)
+	feeds, err := s.db.GetAllFeeds(context.Background())
 	if err != nil {
 		return err
 	}
@@ -167,23 +160,17 @@ func handlerFeeds(s *state, cmd command) error {
 }
 
 func handlerAgg(s *state, cmd command) error {
-	ctx := context.Background()
-	xaml, err := fetchFeed(ctx, "https://wagslane.dev/index.xml")
+	xaml, err := fetchFeed(context.Background(), "https://wagslane.dev/index.xml")
 	handleError(err)
 	fmt.Printf("%s\n", xaml)
 	return nil
 }
 
-func handlerFollow(s *state, cmd command) error {
+func handlerFollow(s *state, cmd command, user database.User) error {
 	if len(cmd.args) != 1 {
 		return fmt.Errorf("This function requires a feed URL.\nUsage: follow <url>")
 	}
-	ctx := context.Background()
-	user, err := s.db.GetUser(ctx, s.cfg.User)
-	if err != nil {
-		return err
-	}
-	feed, err := s.db.GetFeedByUrl(ctx, cmd.args[0])
+	feed, err := s.db.GetFeedByUrl(context.Background(), cmd.args[0])
 	if err != nil {
 		return err
 	}
@@ -194,7 +181,7 @@ func handlerFollow(s *state, cmd command) error {
 		UserID:    user.ID,
 		FeedID:    feed.ID,
 	}
-	res, err := s.db.CreateFeedFollow(ctx, params)
+	res, err := s.db.CreateFeedFollow(context.Background(), params)
 	if err != nil {
 		return err
 	}
@@ -202,13 +189,13 @@ func handlerFollow(s *state, cmd command) error {
 	return nil
 }
 
-func handlerFollowing(s *state, cmd command) error {
+func handlerFollowing(s *state, cmd command, user database.User) error {
 	ctx := context.Background()
-	follows, err := s.db.GetFeedFollowsForUser(ctx, s.cfg.User)
+	follows, err := s.db.GetFeedFollowsForUser(ctx, user.Name)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s's Feeds:\n", s.cfg.User)
+	fmt.Printf("%s's Feeds:\n", user.Name)
 	for _, feed := range follows {
 		fmt.Printf("* %s\n", feed.FeedName)
 	}

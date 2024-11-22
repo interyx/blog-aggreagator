@@ -60,17 +60,17 @@ func main() {
 		cfg: &cfg,
 		db:  database.New(db),
 	}
-	myCommands := commands{}
-	myCommands.names = make(map[string]func(*state, command) error, 5)
-	myCommands.register("login", handlerLogin)
-	myCommands.register("register", handlerRegister)
-	myCommands.register("reset", handlerReset)
-	myCommands.register("users", handlerUsers)
-	myCommands.register("agg", handlerAgg)
-	myCommands.register("addfeed", handlerAddFeed)
-	myCommands.register("feeds", handlerFeeds)
-	myCommands.register("follow", handlerFollow)
-	myCommands.register("following", handlerFollowing)
+	cmds := commands{}
+	cmds.names = make(map[string]func(*state, command) error, 5)
+	cmds.register("login", handlerLogin)
+	cmds.register("register", handlerRegister)
+	cmds.register("reset", handlerReset)
+	cmds.register("users", handlerUsers)
+	cmds.register("agg", handlerAgg)
+	cmds.register("addfeed", middlewareLoggedIn(handlerAddFeed))
+	cmds.register("feeds", handlerFeeds)
+	cmds.register("follow", middlewareLoggedIn(handlerFollow))
+	cmds.register("following", middlewareLoggedIn(handlerFollowing))
 	args := os.Args
 	if len(args) < 2 {
 		handleError(fmt.Errorf("Not enough arguments provided"))
@@ -79,6 +79,6 @@ func main() {
 		name: args[1],
 		args: args[2:],
 	}
-	err = myCommands.run(&thisState, cmd)
+	err = cmds.run(&thisState, cmd)
 	handleError(err)
 }
