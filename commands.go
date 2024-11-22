@@ -16,20 +16,17 @@ import (
 )
 
 func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
-	// step 1: build the request
 	req, err := http.NewRequestWithContext(ctx, "GET", feedURL, nil)
 	if err != nil {
 		return &RSSFeed{}, err
 	}
 	req.Header.Add("User-Agent", "gator")
 	client := http.Client{}
-	// step 2: execute the request
 	res, err := client.Do(req)
 	if err != nil {
 		return &RSSFeed{}, err
 	}
 	defer res.Body.Close()
-	// step 3: read the request
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return &RSSFeed{}, err
@@ -121,7 +118,7 @@ func handlerAddFeed(s *state, cmd command, user database.User) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s", res)
+	fmt.Printf("%+v\n", res)
 	return nil
 }
 
@@ -160,10 +157,35 @@ func handlerFeeds(s *state, cmd command) error {
 }
 
 func handlerAgg(s *state, cmd command) error {
-	xaml, err := fetchFeed(context.Background(), "https://wagslane.dev/index.xml")
+	var time_between_reqs time.Duration
+	var err error
+	if len(cmd.args) > 1 {
+		return fmt.Errorf("Too many arguments.  This function takes a single argument with a duration like \"1m or \"1h\nUsage agg <duration>")
+	}
+	if len(cmd.args) == 0 {
+		time_between_reqs, err = time.ParseDuration("1m")
+	} else {
+		time_between_reqs, err = time.ParseDuration(cmd.args[0])
+	}
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Collecting feeds every %v\n", time_between_reqs)
+	ticker := time.NewTicker(time_between_reqs)
+	for ; ; <-ticker.C {
+		scrapeFeeds(s)
+	}
+}
+
+func scrapeFeeds(s *state) {
+	nextFeed, err := s.db.GetNextFeedToFetch(context.Background())
 	handleError(err)
-	fmt.Printf("%s\n", xaml)
-	return nil
+	feed, err := fetchFeed(context.Background(), nextFeed)
+	handleError(err)
+	fmt.Printf("%s\n------------------\n", feed.Channel.Title)
+	for _, item := range feed.Channel.Item {
+		fmt.Printf("%s\n", item.Title)
+	}
 }
 
 func handlerFollow(s *state, cmd command, user database.User) error {
