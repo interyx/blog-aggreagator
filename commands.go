@@ -2,17 +2,19 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/xml"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/interyx/internal/database"
-	_ "github.com/lib/pq"
 	"html"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/interyx/internal/database"
+	"github.com/lib/pq"
 )
 
 func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
@@ -180,11 +182,37 @@ func handlerAgg(s *state, cmd command) error {
 func scrapeFeeds(s *state) {
 	nextFeed, err := s.db.GetNextFeedToFetch(context.Background())
 	handleError(err)
-	feed, err := fetchFeed(context.Background(), nextFeed)
+	feed, err := fetchFeed(context.Background(), nextFeed.Url)
 	handleError(err)
 	fmt.Printf("%s\n------------------\n", feed.Channel.Title)
 	for _, item := range feed.Channel.Item {
-		fmt.Printf("%s\n", item.Title)
+		var descPub sql.NullTime
+		descString := sql.NullString{
+			String: item.Description,
+			Valid:  true,
+		}
+		descPub.Scan(item.PubDate)
+		params := database.CreatePostParams{
+			ID:          uuid.New(),
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+			Title:       item.Title,
+			Url:         item.Link,
+			Description: descString,
+			PublishedAt: descPub,
+			FeedID:      nextFeed.ID,
+		}
+		post, err := s.db.CreatePost(context.Background(), params)
+		if err != nil {
+			if pqErr, ok := err.(*pq.Error); ok {
+				if pqErr.Code.Name() == "unique_violation" {
+					continue
+				}
+			} else {
+				fmt.Printf("%v\n", err)
+			}
+		}
+		fmt.Printf("Saved %+v successfully \n", post)
 	}
 }
 
