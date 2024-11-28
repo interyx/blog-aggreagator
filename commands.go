@@ -44,6 +44,7 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 		feed.Channel.Item[i].Title = html.UnescapeString(feed.Channel.Item[i].Title)
 		feed.Channel.Item[i].Description = html.UnescapeString(feed.Channel.Item[i].Description)
 	}
+
 	return &feed, nil
 }
 
@@ -179,19 +180,46 @@ func handlerAgg(s *state, cmd command) error {
 	}
 }
 
+func interpretTime(s string) sql.NullTime {
+	timeFormats := []string{
+		time.RFC1123Z,
+		time.RFC1123,
+		time.RFC822,
+		time.RFC822Z,
+		time.RFC850,
+		time.RFC3339,
+		time.RFC3339Nano,
+	}
+	var parsedTime sql.NullTime
+	for _, format := range timeFormats {
+		if parseAttempt, err := time.Parse(format, s); err == nil {
+			parsedTime = sql.NullTime{
+				Time:  parseAttempt,
+				Valid: true,
+			}
+			return parsedTime
+		}
+	}
+	return parsedTime
+}
+
 func scrapeFeeds(s *state) {
 	nextFeed, err := s.db.GetNextFeedToFetch(context.Background())
 	handleError(err)
 	feed, err := fetchFeed(context.Background(), nextFeed.Url)
 	handleError(err)
-	fmt.Printf("%s\n------------------\n", feed.Channel.Title)
+	err = s.db.MarkFeedFetched(context.Background(), nextFeed.ID)
+	handleError(err)
+	fmt.Printf("Scanning %s...\n", feed.Channel.Title)
 	for _, item := range feed.Channel.Item {
-		var descPub sql.NullTime
+		descPub := interpretTime(item.PubDate)
+		if !descPub.Valid {
+			fmt.Printf("Publish time %v could not be read\n", item.PubDate)
+		}
 		descString := sql.NullString{
 			String: item.Description,
 			Valid:  true,
 		}
-		descPub.Scan(item.PubDate)
 		params := database.CreatePostParams{
 			ID:          uuid.New(),
 			CreatedAt:   time.Now(),
@@ -202,17 +230,16 @@ func scrapeFeeds(s *state) {
 			PublishedAt: descPub,
 			FeedID:      nextFeed.ID,
 		}
-		post, err := s.db.CreatePost(context.Background(), params)
+		_, err := s.db.CreatePost(context.Background(), params)
 		if err != nil {
 			if pqErr, ok := err.(*pq.Error); ok {
 				if pqErr.Code.Name() == "unique_violation" {
 					continue
 				}
 			} else {
-				fmt.Printf("%v\n", err)
+				fmt.Printf("An error has occurred: %v\n", err)
 			}
 		}
-		fmt.Printf("Saved %+v successfully \n", post)
 	}
 }
 
