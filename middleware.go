@@ -5,7 +5,7 @@ import (
 	// "encoding/xml"
 	// "fmt"
 	// "github.com/google/uuid"
-	"github.com/interyx/internal/database"
+	"github.com/interyx/gator/internal/database"
 	_ "github.com/lib/pq"
 	// "html"
 	// "io"

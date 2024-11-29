@@ -10,10 +10,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/interyx/internal/database"
+	"github.com/interyx/gator/internal/database"
 	"github.com/lib/pq"
 )
 
@@ -290,6 +291,29 @@ func handlerUnfollow(s *state, cmd command, user database.User) error {
 	err := s.db.DeleteFeedFollow(context.Background(), params)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func handlerBrowse(s *state, cmd command, user database.User) error {
+	limit := int32(2)
+	if len(cmd.args) == 1 {
+		input, err := strconv.ParseInt(cmd.args[0], 0, 32)
+		limit = int32(input)
+		if err != nil {
+			return err
+		}
+	}
+	params := database.GetPostsForUserParams{
+		Limit: limit,
+		Name:  user.Name,
+	}
+	res, err := s.db.GetPostsForUser(context.Background(), params)
+	if err != nil {
+		return err
+	}
+	for _, item := range res {
+		fmt.Printf("%s\n------------\n%s\n%s\n\n", item.Title, item.Description.String, item.Url)
 	}
 	return nil
 }

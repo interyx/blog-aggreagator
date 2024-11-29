@@ -13,8 +13,8 @@ VALUES(
   RETURNING *;
 
 -- name: GetPostsForUser :many
-SELECT posts.title, posts.description FROM posts
-WHERE posts.feed_id = (
+SELECT posts.title, posts.description, posts.url FROM posts
+WHERE posts.feed_id IN (
   SELECT feed_follows.feed_id FROM feed_follows 
   INNER JOIN users ON user_id = users.id
   INNER JOIN feeds ON feed_id = feeds.id

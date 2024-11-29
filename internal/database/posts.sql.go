@@ -65,8 +65,8 @@ func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (Post, e
 }
 
 const getPostsForUser = `-- name: GetPostsForUser :many
-SELECT posts.title, posts.description FROM posts
-WHERE posts.feed_id = (
+SELECT posts.title, posts.description, posts.url FROM posts
+WHERE posts.feed_id IN (
   SELECT feed_follows.feed_id FROM feed_follows 
   INNER JOIN users ON user_id = users.id
   INNER JOIN feeds ON feed_id = feeds.id
@@ -84,6 +84,7 @@ type GetPostsForUserParams struct {
 type GetPostsForUserRow struct {
 	Title       string
 	Description sql.NullString
+	Url         string
 }
 
 func (q *Queries) GetPostsForUser(ctx context.Context, arg GetPostsForUserParams) ([]GetPostsForUserRow, error) {
@@ -95,7 +96,7 @@ func (q *Queries) GetPostsForUser(ctx context.Context, arg GetPostsForUserParams
 	var items []GetPostsForUserRow
 	for rows.Next() {
 		var i GetPostsForUserRow
-		if err := rows.Scan(&i.Title, &i.Description); err != nil {
+		if err := rows.Scan(&i.Title, &i.Description, &i.Url); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

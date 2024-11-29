@@ -3,8 +3,8 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/interyx/internal/config"
-	"github.com/interyx/internal/database"
+	"github.com/interyx/gator/internal/config"
+	"github.com/interyx/gator/internal/database"
 	_ "github.com/lib/pq"
 	"os"
 )
@@ -72,6 +72,7 @@ func main() {
 	cmds.register("follow", middlewareLoggedIn(handlerFollow))
 	cmds.register("following", middlewareLoggedIn(handlerFollowing))
 	cmds.register("unfollow", middlewareLoggedIn(handlerUnfollow))
+	cmds.register("browse", middlewareLoggedIn(handlerBrowse))
 	args := os.Args
 	if len(args) < 2 {
 		handleError(fmt.Errorf("Not enough arguments provided"))
